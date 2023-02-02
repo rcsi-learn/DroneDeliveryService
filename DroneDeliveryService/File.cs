@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace DroneDeliveryService {
     internal class File {
+        //Read a file and returns the content in an array.
         public static string[] Input(string FilePath) {
             string[] Content = { };
             try {
@@ -16,6 +17,7 @@ namespace DroneDeliveryService {
             }
             return Content;
         }
+        //Write a file from a array
         public static void Output(string FilePath, string[] OutputContent) {
             try {
                 System.IO.File.WriteAllLines(FilePath, OutputContent);

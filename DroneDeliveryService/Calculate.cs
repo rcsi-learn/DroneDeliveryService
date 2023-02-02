@@ -6,31 +6,38 @@ using System.Threading.Tasks;
 
 namespace DroneDeliveryService {
     public class Calculate {
-        private static string FileName = string.Empty;
-        private static List<Drone> Drones = new List<Drone>();
-        private static List<Location> Locations = new List<Location>();
-        private static List<DroneTrips> DronesTrips = new List<DroneTrips>();
+        private static List<Drone> Drones;
+        private static List<Location> Locations;
+        private static List<DroneTrips> DronesTrips;
 
+        //Drone class
         private class Drone {
             public string Name { get; set; } = string.Empty;
             public int Capacity { get; set; }
         }
+        //Location class
         private class Location {
             public string Name { get; set; } = string.Empty;
             public int Weight { get; set; }
             public bool Covered { get; set; }
         }
+        //DroneTripos calss
         public class DroneTrips {
             public string DroneName { get; set; } = string.Empty;
             public string Trip { get; set; } = string.Empty;
             public string[] Locations { get; set; } = { };
         }
+        //General process 
         public static void Process(string InputFile) {
             GetInformation(InputFile);
             CalculatingTripsByWeight();
-            WriteResults(InputFile.Replace("input", "output"));
+            OutputResults(InputFile.Replace("input", "output"));
         }
-        public static void GetInformation(string FileInput) {
+        //Method for get Information from file.
+        private static void GetInformation(string FileInput) {
+            Drones = new List<Drone>();
+            Locations = new List<Location>();
+
             Console.WriteLine("Reading Input File.....");
             string[] Input = File.Input(FileInput);
 
@@ -41,55 +48,83 @@ namespace DroneDeliveryService {
             }
 
             string[] InputLocations = { };
-            for (int i = 1; i < Input.Length; i += 2) {
+            for (int i = 1; i < Input.Length; i++) {
                 InputLocations = Input[i].Replace("[", "").Replace("]", "").Split(",");
                 Locations.Add(new Location() { Name = InputLocations[0].Trim(), Weight = int.Parse(InputLocations[1].Trim()), Covered = false });
             }
         }
-        public static void CalculatingTripsByWeight() {
+
+        //Method for drone trips calculation.
+        private static void CalculatingTripsByWeight() {
+            DronesTrips = new List<DroneTrips>();
             Console.WriteLine("Calculating.....");
-            //sort de Drones and Locations.
+            //Sort de Drones by Capacity
             Drone[] SortedDrones = Drones.OrderByDescending(x => x.Capacity).ToArray();
+            //Sort de Locations by Weight
             Location[] SortedLocations = Locations.OrderByDescending(x => x.Weight).ToArray();
-            int CountTrips;
+            //Auxiliar list for accumulate Locations for drone trips
             List<string> AccLocations = new List<string>(); ;
-            int AccWeight;
-            for (int i = 0; i < SortedDrones.Length; i++) {
-                CountTrips = 0; // CounterTrips
-                AccWeight = 0; // Weight Accumulated
-                AccLocations = new List<string>(); //Accumulated locations.
-                for (int j = 0; j < SortedLocations.Length; j++) {
-                    if (SortedLocations[j].Covered) continue; // if a location is covered continue whit next
-                    if (SortedDrones[i].Capacity < (AccWeight + SortedLocations[j].Weight)) continue; //Calculate if the drone has the capacity, if not go to the next location.
-
-                    if (SortedDrones[i].Capacity == (AccWeight + SortedLocations[j].Weight)) { // if exist a conicidence add a new Trip for the drone
-                        CountTrips += 1;
-                        AccLocations.Add(SortedLocations[j].Name); //add to accumulated locations.
-
-                        for (int k = 0; k < SortedLocations.Length; k++) {
-                            if (AccLocations.Contains($"[{SortedLocations[k].Name}]")) SortedLocations[k].Covered = true; // set covered the locations accumulated.
-                        }
-                        // Add to the list of drone trips all the accumulated locations.
-                        DronesTrips.Add(new DroneTrips() {
-                            DroneName = $"[{SortedDrones[i].Name}]",
-                            Trip = $"Trip #{CountTrips}",
-                            Locations = AccLocations.ToArray()
-                        });
-                        AccLocations = new List<string>(); //reset the Accumulated Locations.
-                        AccWeight = 0; //reset the accumulated weight.
-                        j = 0; //back for another iteration.
+            //Auxiliar int for accumulate Weight
+            int AccWeight = 0;
+            //Iterate until all every location until all are covered
+            while (SortedLocations.Any(x => x.Covered == false)) {
+                //Find locations combination order by weight and look if exist a drone with the accumulate wheight
+                for (int i = 0; i < SortedLocations.Length; i++) {
+                    //If the location is covered go to the next
+                    if (SortedLocations[i].Covered) continue;
+                    //If exists a drone with aviable capacty iterate again
+                    //In the first itearation will the first SortedLocation will be added to AccLocations.
+                    if (SortedDrones.Any(x => x.Capacity > AccWeight + SortedLocations[i].Weight)) {
+                        AccLocations.Add(SortedLocations[i].Name);
+                        AccWeight += SortedLocations[i].Weight;
                         continue;
                     }
-                    AccLocations.Add($"[{SortedLocations[j].Name}]"); // if is not the same capacity or the drone has more capacity then accumulate the location.
-                    AccWeight += SortedLocations[j].Weight; // accumulate weight.
+                    //If NOT exist a drone with aviable capacity maybe a drone with the same capacity
+                    if (Drones.Any(x => x.Capacity == AccWeight + SortedLocations[i].Weight)) {
+                        AccLocations.Add(SortedLocations[i].Name);
+                        AccWeight += SortedLocations[i].Weight;
+                        break;
+                    }
+                    //If AccWeight + the current location exceed the drones capacity try with the next Location.
                 }
+                //Look for the optimal drone in the SortedDrones array.
+                Drone OptDrone = SortedDrones[0];
+                for (int i = 0; i < SortedDrones.Length; i++) {
+                    //if the Capacity exceed the AccWeight try with the next
+                    if (SortedDrones[i].Capacity > AccWeight) OptDrone = SortedDrones[i];
+                    //if the Capacity are equals to AccWeight  is the optimus drone
+                    else if (SortedDrones[i].Capacity == AccWeight) {
+                        OptDrone = SortedDrones[i];
+                        break;
+                    }
+                    //AccWeight is more than the capcity, use the last OptDrone saved.
+                    else break;
+                }
+
+                //Add to the List of Drone  Trips
+                DronesTrips.Add(new DroneTrips() {
+                    DroneName = $"[{OptDrone.Name}]",//Save the Drone name with format
+                    Trip = $"Trip #{DronesTrips.FindAll(x => x.DroneName == $"[{OptDrone.Name}]").Count() + 1}", //Count the Trips saved of the drone and add 1 (the current trip)
+                    Locations = AccLocations.ToArray() //Save the accumulated Locations.
+                });
+
+                //turn to covered true to all locations accumulated for the next iteration
+                for (int i = 0; i < SortedLocations.Length; i++) {
+                    if (AccLocations.Contains(SortedLocations[i].Name)) SortedLocations[i].Covered = true;
+                }
+                //reset the Accumulated Locations.
+                AccLocations = new List<string>();
+                //reset the accumulated weight.
+                AccWeight = 0;
             }
         }
-        public static void WriteResults(string OutputFile) {
-            Console.WriteLine("Writing output.....");
+        //Method for the result.
+        private static void OutputResults(string OutputFile) {
+            Console.WriteLine("Format output.....");
             DroneTrips[] SortedDronesTrips = DronesTrips.OrderBy(x => x.DroneName).ToArray();
             string CurrentDroneName = string.Empty;
             var OutputContent = new List<string>();
+            //Add to OutputContent List in the correct order
             for (int i = 0; i < SortedDronesTrips.Length; i++) {
                 if (CurrentDroneName != SortedDronesTrips[i].DroneName) {
                     CurrentDroneName = SortedDronesTrips[i].DroneName;
@@ -99,6 +134,7 @@ namespace DroneDeliveryService {
                 OutputContent.Add(SortedDronesTrips[i].Trip);
                 OutputContent.Add(string.Join(", ", SortedDronesTrips[i].Locations));
             }
+            Console.WriteLine("Write output.....");
             File.Output(OutputFile, OutputContent.ToArray());
         }
     }
